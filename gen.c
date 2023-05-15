@@ -39,7 +39,5 @@ int main(int argc, char** argv)
     for(int i = 0; i < total_size; i++)
         printf("%c", buff[i]);
 
-    printf("\0");
-
     return 0;
 }
